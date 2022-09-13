@@ -1,0 +1,194 @@
+---
+title: "A Multiple Linear Model for Toronto and Mississauga House Prices"
+author: "MZ9201"
+date: "December 5, 2020"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+## I. Data Wrangling
+
+#(a):
+
+```{r, echo=FALSE}
+library(tidyverse)
+setwd("/Users/ZHANGMIN/Desktop")
+house_data <- read_csv("real203.csv")
+set.seed(1004709201)
+sampled_data <- sample_n(house_data,150) 
+```
+
+
+#(b):
+
+
+#(c):
+
+```{r, echo=FALSE}
+library(skimr)
+
+sampled_data <- sampled_data %>% 
+  subset(select=-c(maxsqfoot))  # removed maxsqfoot
+
+updated_data <- sampled_data %>%  #9201 
+  filter(ID != 89) %>% 
+  filter(ID != 114) %>% 
+  filter(ID != 113) %>%
+  filter(ID != 96) %>%
+  filter(ID != 109) %>%
+  filter(ID != 76) %>%
+  filter(ID != 81) %>%
+  filter(ID != 61) %>%
+  filter(ID != 84) %>%
+  filter(ID != 55)   # filter out ten cases where the value is missing.
+skim(updated_data)  #9201 
+```
+
+```{r}
+a <- lm(sale~taxes, data = updated_data)
+summary(a)
+plot(a)             
+```
+
+
+
+In sampled_data, we can see that one of the predictors "maxsqfoot" has 91 out of 150 cases missing, which accounts for the most cases missing among all predictors in this dataset. Thus, we chose to remove this predictor maxsqfoot, so that a large amount of missing values in "maxsqfoot" will not affect our analysis.  
+
+We also chose to remove 10 cases where one of its values marked as NA, that is, one of its values is missing. The remaining cases will have all values in each predictor available. 
+
+
+## II. Exploratory Data Analysis
+
+#(a):  Table 1
+
+```{r, echo=FALSE}
+predictor_name <- c("ID", "sale", "list", "bedroom", "bathroom", "parking", "maxsqfoot", "taxes", "lotwidth", "lotlength", "location", "lotsize")
+Type <- c("discrete","continuous","continuous","discrete","discrete","discrete","discrete","continuous","continuous","continuous","categorical","continuous")
+table_sum <- data.frame(predictor_name,Type)
+table_sum 
+```
+
+#(b):   Table 2 
+
+```{r, echo=FALSE}
+attach(updated_data)
+pairs(~list+bedroom+bathroom+parking+taxes+lotsize,data=updated_data,gap=0.4,cex.labels=0.85)
+numericx <- cbind(list, bedroom, bathroom, parking, taxes, lotsize)
+pairs(sale~list+bedroom+bathroom+parking+taxes+lotsize,data=updated_data,cex.labels=0.85)
+numericxy=cbind(sale,numericx)
+rank_matter <- round(cor(numericxy), 4)
+rank_matter  #9201
+```
+
+# Table 3:
+
+
+```{r, echo=FALSE}
+cor_coefficient <- c(rank_matter[1,2],rank_matter[1,6],rank_matter[1,4],rank_matter[1,3],rank_matter[1,7],rank_matter[1,5])
+rank_name <- c("list","taxes","bathroom","bedroom","lotsize","parking")
+
+t_sum <- data.frame(rank_name,cor_coefficient)
+rownames(t_sum) <- (c(1,2,3,4,5,6))
+t_sum
+```
+
+We can see that from the scatterplot matrix and pairwise correlations that the predictor "list" has the higest association to the response variable "sale", with the coefficient of 0.9862. In contrast, the predictor "parking" has least association to the response "sale", which can be seen from the correlation coefficient of 0.1827.
+
+#(c): # Figure 1:
+
+```{r, echo=FALSE}
+lm_1 <- lm(updated_data$sale~updated_data$lotsize)
+plot(lm_1,3)
+```
+
+In the scatterplot matrix above, we can see from "lotsize against sale" plot that when the value of the predictor "lotsize" increases, the spread of points becomes wider. This trends suggests that this model has non constant variance, meaning the variance of each error term across observations is not constant. 
+
+We can confirm our assumption by plotting a scale-location plot. In this plot, we can see that the red line firstly has quadratic relation and later starts to increase. This suggests that the variance of each case is not constant, which violates the concept of homoscedasticity. Besides, points on this plot also tends to have an increase pattern, although it is not too obvious to conclude. 
+
+
+## III. Methods and Model
+
+#i:  Table 4:
+
+```{r,echo=FALSE}
+sale_model <- lm(sale~list+bedroom+bathroom+parking+as.factor(location)+taxes+lotsize, data=updated_data)
+summary(sale_model)  #9201
+
+Estimated_coefficient <- c(summary(sale_model)$coefficients[2,1],summary(sale_model)$coefficients[3,1],summary(sale_model)$coefficients[4,1],summary(sale_model)$coefficients[5,1],summary(sale_model)$coefficients[6,1],summary(sale_model)$coefficients[7,1],summary(sale_model)$coefficients[8,1])
+
+P_value <- c(summary(sale_model)$coefficients[2,4],summary(sale_model)$coefficients[3,4],summary(sale_model)$coefficients[4,4],summary(sale_model)$coefficients[5,4],summary(sale_model)$coefficients[6,4],summary(sale_model)$coefficients[7,4],summary(sale_model)$coefficients[8,4])
+
+table_of_summary <- data.frame(Estimated_coefficient,P_value)
+rownames(table_of_summary) <- (c("list","bedroom","bathroom","parking","location","taxes","lotsize"))
+table_of_summary
+```
+
+From the summary of the multiple linear regression model above, we can see that the regression coefficients from predictors "list", "parking" and "taxes" are significant, because the p-values for these corresponding t-tests are $4.2100*10^{-7}$, $0.0436$,  $6.2156*10^{-6}$, which are statistically significant.
+
+To interpret these coefficients, we can see that when the list price of a property in Toronto and Mississagua increases by additional 1 Canadian dollar, the estimated sale price will increase by $0.8319$ Canadian dollar, given other predictors unchanged. Similarly, when a property has an additional one parking spot, the estimated sale price of this property tends to decrease by $1.9209*10^4$ Canadian dollar, given other predictors unchanged. Lastly, when the owner of a property paid additional 1 dollar property tax in the previous year, the estimated sale price of this property tends to increase by 19.92 dollars, given other predictors unchanged. 
+
+#ii:
+
+```{r,echo=FALSE}
+fullmodel = lm(sale~list+bedroom+bathroom+parking+location+taxes+lotsize, data=updated_data)
+back1=step(fullmodel, direction = "backward")
+summary(back1)  #9201
+```
+
+## "Final model" with AIC: #9201
+
+$$
+\begin{equation} 
+\hat{sale} = 60550+\hat{list}\times0.8379+\hat{bedroom}\times26180+\hat{parking}\times-18440+\hat{location}\times73590+\hat{taxes}\times19.76
+\end{equation}
+$$ 
+The "final model" shown above is not consistent with the model indicated in part i. Because the model in part(i) shwos that the predictors "list", "parking" and "taxes" are statistically significant whereas the final model with AIC consists of predictors "list", "bedroom", "parking", "location" and "taxes". 
+
+
+```{r, echo=FALSE}
+back2=step(fullmodel, direction = "backward", k=log(140))
+summary(back2) #9201
+```
+
+
+$$
+\begin{equation} 
+\hat{sale} = 67290+\hat{list}\times0.836+\hat{location}\times136600+\hat{taxes}\times19.07
+\end{equation}
+$$
+
+The results in this model is inconsistent with neithter the model in part(i) and part(ii), as this "final model" only consists of predictors "list", "location" and "taxes", which have different variable selections and regression coefficients from the models in part(i) and part(ii). 
+
+## IV. Discussions and Limitations
+
+#(a):    # Figure 2: 
+```{r, echo=FALSE}
+par(mfrow=c(2,2))
+plot(back2)  #9201
+```
+
+
+#(b):
+
+Four diagonostic plots above have different ability to analyze the "final model" created in the previous part. 
+
+The first "residuals vs fitted" plot checks linearity of fitted model. We can that the red line in the plot is horizontally flat and points on this plot are randomly spread out, indicating this model is a good fit in terms of linearity. 
+
+The second "Normal QQ plot" checks normality of the model. In this case, most points lie along the dotted line, which indiates that data are normally distributed. However, there are also few points like 102 and 170 where they do not lie along the line, showing some tails here. We need to further investigate by drawing a histogram of the fitted model to show if it is normally distributed.
+
+The third plot "Scale-Location" plot checks if the model has constant variance. We can see from the plot that points are randomly spread out. Although the red line shows a slight increase at the begining, it continues to be flat and it does not have a clear increase trend. This suggests that this model has constant variance, which is a good sign to homoscedasticity. 
+
+The last plot "residual vs leverage" plots examines if there is any point which has high leverage and residual, helping us detect outliers. Dotted red line represents Cook's distance. In this case, there are no points situating outside of the dotted line, meaning there is no high influential point. The red solid line is horizontally flat which also shows homoscedasticity. 
+
+Overall, we can see that this so-called "final model" has a good fit to the linearity and normality. However, having these four diagonostic plots are not sufficient to conclude that the normal error assumption is satisfied, as we have not checked multicolinearity of this fitted model, meaning we do not know if individual predictor is correlated to each other. 
+
+
+#(c):
+
+In order to find a better and valid "final" model, it is necessary to increase sample size than the current 140 cases, because having a larger sample would allow us to have a better understanding of the sale prices data of houses in Toronto and Mississauga.
+
+In the process of analyzing the "final model", we found that there is skewness shown from the normal QQ plot. We will further investigate these cases by drawing a histogram, which will show if the model is normally distributed. Besides, we need to figure out if these points are outliers or influential points. 
+
+Another step needs to be done is to check the multicolinearity of the fitted model, because in the previous steps, we did not know if individual predictors are correlated to each other in MLR, and this is important because multicolinearity could potentially cause the fitted model unstable and the estimated regression coefficients may even have opposite sign than the current ones. If predictors are highly correlated, we should only keep the ones that fit our best interest.
